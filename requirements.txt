@@ -1,0 +1,9 @@
+﻿PyQt6>=6.11.0
+mss>=10.2.0
+Pillow>=12.2.0
+numpy>=2.4.6
+opencv-contrib-python>=4.13.0
+pytesseract>=0.3.13
+deep-translator>=1.11.4
+argostranslate>=1.11.0
+winsdk>=1.0.0b10

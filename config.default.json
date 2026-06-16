@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "theme": "dark",
+  "capture_screen_index": 0,
+  "output_screen_index": 1,
+  "ocr_interval_ms": 150,
+  "translation_enabled": true,
+  "translation_target": "en",
+  "ocr_engine": "winrt",
+  "ocr_preprocessing": {
+    "contrast": 0.5,
+    "sharpness": 1.5,
+    "denoise": 4,
+    "auto_enhance": true
+  },
+  "stabilizer": {
+    "enabled": true,
+    "frames": 2,
+    "similarity_percent": 100
+  },
+  "quick_capture": {
+    "enabled": false,
+    "modifier": "ctrl+shift",
+    "key": "Q"
+  },
+  "opencv": {
+    "enabled": true,
+    "ocr_mode": "filtered",
+    "preset": "subtitle_auto",
+    "color_mode": "gray",
+    "show_advanced": false,
+    "live_preview": true,
+    "invert": false,
+    "blur": 3,
+    "threshold": 170,
+    "dilate_iter": 1
+  },
+  "filter_profiles": {},
+  "active_filter_profile": "",
+  "regions": {
+    "dialogue": [0, 0, 800, 200],
+    "menu": [0, 0, 400, 300]
+  },
+  "output_window": {
+    "width": 1000,
+    "height": 600,
+    "opacity": 0.95,
+    "always_on_top": true,
+    "font_size_dialogue": 24,
+    "font_size_menu": 20,
+    "font_size_source_dialogue": 11,
+    "font_size_source_menu": 10,
+    "show_timestamp": true,
+    "auto_show": true,
+    "save_position": true
+  },
+  "translation_backend": "google",
+  "translation_source": "en"
+}
