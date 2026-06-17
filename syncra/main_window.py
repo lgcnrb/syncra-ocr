@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QColorDialog,
     QComboBox,
+    QDialog,
     QFormLayout,
     QFrame,
     QGridLayout,
@@ -399,40 +400,40 @@ TRANSLATIONS = {
 
 THEME_COLORS = {
     "dark": {
-        "bg_primary": "#0c0e14",
-        "bg_secondary": "#111318",
-        "bg_tertiary": "#0e1016",
-        "bg_elevated": "#15181e",
-        "border": "#1c2028",
-        "border_active": "#2a5080",
-        "text_primary": "#d8dce6",
-        "text_secondary": "#a0a8b4",
-        "text_muted": "#505868",
-        "accent": "#3a7abd",
-        "accent_hover": "#4a90d0",
-        "accent_bg": "#111d2e",
-        "success": "#3a8a42",
-        "warning": "#c49830",
-        "error": "#c04040",
-        "group_title": "#5a8ab0",
+        "bg_primary": "#0b0d11",
+        "bg_secondary": "#10121a",
+        "bg_tertiary": "#0e1017",
+        "bg_elevated": "#161a24",
+        "border": "#1e2330",
+        "border_active": "#3b82f6",
+        "text_primary": "#e2e8f0",
+        "text_secondary": "#94a3b8",
+        "text_muted": "#475569",
+        "accent": "#3b82f6",
+        "accent_hover": "#60a5fa",
+        "accent_bg": "#0f1a2e",
+        "success": "#22c55e",
+        "warning": "#eab308",
+        "error": "#ef4444",
+        "group_title": "#64748b",
     },
     "light": {
-        "bg_primary": "#f4f6f9",
+        "bg_primary": "#f8fafc",
         "bg_secondary": "#ffffff",
-        "bg_tertiary": "#e8ecf0",
-        "bg_elevated": "#f0f4f8",
-        "border": "#d0d7de",
-        "border_active": "#0969da",
-        "text_primary": "#1f2328",
-        "text_secondary": "#57606a",
-        "text_muted": "#8b949e",
-        "accent": "#0969da",
-        "accent_hover": "#0550ae",
-        "accent_bg": "#ddf4ff",
-        "success": "#1a7f37",
-        "warning": "#9a6700",
-        "error": "#cf222e",
-        "group_title": "#57606a",
+        "bg_tertiary": "#f1f5f9",
+        "bg_elevated": "#ffffff",
+        "border": "#e2e8f0",
+        "border_active": "#3b82f6",
+        "text_primary": "#0f172a",
+        "text_secondary": "#475569",
+        "text_muted": "#94a3b8",
+        "accent": "#3b82f6",
+        "accent_hover": "#2563eb",
+        "accent_bg": "#eff6ff",
+        "success": "#16a34a",
+        "warning": "#ca8a04",
+        "error": "#dc2626",
+        "group_title": "#475569",
     },
 }
 
@@ -2751,6 +2752,7 @@ class MainWindow(QMainWindow):
         self.thread_pool = QThreadPool.globalInstance()
         self.thread_pool.setMaxThreadCount(2)
         self._ocr_running = False
+        self._test_mode = False
         self._quick_capture_running = False
         self._quick_capture_resume_live = False
         self._capture = mss.mss() if mss else None
@@ -5178,6 +5180,7 @@ class MainWindow(QMainWindow):
                 "Translation backend is not available. Install deep-translator.",
             )
             return
+        self._test_mode = True
         self._tick()
 
     def _tick(self) -> None:
@@ -5247,6 +5250,8 @@ class MainWindow(QMainWindow):
     ) -> None:
         self._ocr_ms = (time.time() - getattr(self, "_ocr_start_time", time.time())) * 1000
         self._ocr_running = False
+        was_test = getattr(self, "_test_mode", False)
+        self._test_mode = False
         worker = self._current_ocr_worker
         self._current_ocr_worker = None
         if worker is not None:
@@ -5256,6 +5261,14 @@ class MainWindow(QMainWindow):
 
         if error_text:
             self._set_status(f"OCR error: {error_text.strip()}")
+            if was_test:
+                QMessageBox.warning(self, APP_NAME, f"OCR error:\n{error_text.strip()}")
+            return
+
+        if was_test:
+            self._show_test_result_dialog(
+                dialogue_text, menu_text, dialogue_translated, menu_translated
+            )
             return
 
         self._apply_live_results(
@@ -5270,6 +5283,221 @@ class MainWindow(QMainWindow):
     def _release_worker(self, worker: QRunnable) -> None:
         if worker in self._active_workers:
             self._active_workers.remove(worker)
+
+    def _show_test_result_dialog(
+        self,
+        dialogue_text: str,
+        menu_text: str,
+        dialogue_translated: str,
+        menu_translated: str,
+    ) -> None:
+        dialog = OCRTestResultDialog(
+            self,
+            dialogue_text=dialogue_text,
+            menu_text=menu_text,
+            dialogue_translated=dialogue_translated,
+            menu_translated=menu_translated,
+            translation_enabled=self.translation_enabled_check.isChecked(),
+            target_lang=self._current_translation_target(),
+            ocr_time_ms=self._ocr_ms,
+            capture_time_ms=self._capture_ms,
+            backend_name=self.backend.name,
+        )
+        dialog.exec()
+
+
+class OCRTestResultDialog(QDialog):
+    def __init__(
+        self,
+        parent=None,
+        dialogue_text: str = "",
+        menu_text: str = "",
+        dialogue_translated: str = "",
+        menu_translated: str = "",
+        translation_enabled: bool = False,
+        target_lang: str = "en",
+        ocr_time_ms: float = 0.0,
+        capture_time_ms: float = 0.0,
+        backend_name: str = "unknown",
+    ):
+        super().__init__(parent)
+        self.setWindowTitle("OCR Test Result")
+        self.setMinimumSize(520, 420)
+        self.setMaximumSize(700, 600)
+        self.setModal(False)
+
+        tc = get_theme_colors("dark")
+        self.setStyleSheet(f"""
+            QDialog {{
+                background: {tc['bg_primary']};
+                color: {tc['text_primary']};
+            }}
+            QLabel#DialogTitle {{
+                color: {tc['accent']};
+                font-size: 16px;
+                font-weight: 800;
+            }}
+            QLabel#DialogSubtitle {{
+                color: {tc['text_muted']};
+                font-size: 11px;
+            }}
+            QLabel#SectionLabel {{
+                color: {tc['group_title']};
+                font-size: 10px;
+                font-weight: 700;
+                letter-spacing: 1px;
+            }}
+            QLabel#TextLabel {{
+                color: {tc['text_primary']};
+                font-size: 13px;
+                background: {tc['bg_secondary']};
+                border: 1px solid {tc['border']};
+                border-radius: 8px;
+                padding: 10px 12px;
+            }}
+            QLabel#EmptyLabel {{
+                color: {tc['text_muted']};
+                font-size: 12px;
+                font-style: italic;
+                background: {tc['bg_secondary']};
+                border: 1px solid {tc['border']};
+                border-radius: 8px;
+                padding: 10px 12px;
+            }}
+            QLabel#TimeLabel {{
+                color: {tc['text_secondary']};
+                font-size: 11px;
+            }}
+            QPushButton {{
+                padding: 6px 16px;
+                background: {tc['bg_secondary']};
+                color: {tc['text_secondary']};
+                border: 1px solid {tc['border']};
+                border-radius: 6px;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{
+                background: {tc['bg_elevated']};
+                border-color: {tc['border_active']};
+                color: {tc['text_primary']};
+            }}
+            QPushButton#BtnCopy {{
+                background: {tc['accent_bg']};
+                color: {tc['accent']};
+                border-color: {tc['accent_bg']};
+                font-weight: 700;
+            }}
+            QPushButton#BtnCopy:hover {{
+                background: {tc['accent']};
+                color: {tc['bg_primary']};
+            }}
+        """)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(20, 16, 20, 16)
+        root.setSpacing(10)
+
+        header = QHBoxLayout()
+        title = QLabel("OCR Test Result")
+        title.setObjectName("DialogTitle")
+        subtitle = QLabel(f"{backend_name.upper()}  |  {ocr_time_ms:.0f}ms OCR  |  {capture_time_ms:.0f}ms capture")
+        subtitle.setObjectName("DialogSubtitle")
+        header.addWidget(title)
+        header.addStretch()
+        header.addWidget(subtitle)
+        root.addLayout(header)
+
+        sep = QFrame()
+        sep.setObjectName("Separator")
+        sep.setFixedHeight(1)
+        root.addWidget(sep)
+
+        has_dialogue = bool(dialogue_text.strip())
+        has_menu = bool(menu_text.strip())
+
+        if has_dialogue:
+            d_header = QHBoxLayout()
+            d_label = QLabel("DIALOGUE")
+            d_label.setObjectName("SectionLabel")
+            d_header.addWidget(d_label)
+            d_header.addStretch()
+            if has_dialogue:
+                d_copy = QPushButton("Copy")
+                d_copy.setObjectName("BtnCopy")
+                d_copy.setFixedWidth(60)
+                d_copy.clicked.connect(lambda: QApplication.clipboard().setText(dialogue_text))
+                d_header.addWidget(d_copy)
+            root.addLayout(d_header)
+
+            d_text = QLabel(dialogue_text.strip() if dialogue_text.strip() else "(no text detected)")
+            d_text.setObjectName("TextLabel" if dialogue_text.strip() else "EmptyLabel")
+            d_text.setWordWrap(True)
+            d_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            root.addWidget(d_text)
+
+            if translation_enabled and dialogue_translated.strip():
+                dt_label = QLabel("TRANSLATED")
+                dt_label.setObjectName("SectionLabel")
+                root.addWidget(dt_label)
+                dt_text = QLabel(dialogue_translated.strip())
+                dt_text.setObjectName("TextLabel")
+                dt_text.setWordWrap(True)
+                dt_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+                root.addWidget(dt_text)
+
+        if has_menu:
+            m_header = QHBoxLayout()
+            m_label = QLabel("MENU")
+            m_label.setObjectName("SectionLabel")
+            m_header.addWidget(m_label)
+            m_header.addStretch()
+            m_copy = QPushButton("Copy")
+            m_copy.setObjectName("BtnCopy")
+            m_copy.setFixedWidth(60)
+            m_copy.clicked.connect(lambda: QApplication.clipboard().setText(menu_text))
+            m_header.addWidget(m_copy)
+            root.addLayout(m_header)
+
+            m_text = QLabel(menu_text.strip() if menu_text.strip() else "(no text detected)")
+            m_text.setObjectName("TextLabel" if menu_text.strip() else "EmptyLabel")
+            m_text.setWordWrap(True)
+            m_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            root.addWidget(m_text)
+
+            if translation_enabled and menu_translated.strip():
+                mt_label = QLabel("TRANSLATED")
+                mt_label.setObjectName("SectionLabel")
+                root.addWidget(mt_label)
+                mt_text = QLabel(menu_translated.strip())
+                mt_text.setObjectName("TextLabel")
+                mt_text.setWordWrap(True)
+                mt_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+                root.addWidget(mt_text)
+
+        if not has_dialogue and not has_menu:
+            empty = QLabel("No text detected in any region.\nTry adjusting filter settings or region selection.")
+            empty.setObjectName("EmptyLabel")
+            empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            root.addWidget(empty)
+
+        root.addStretch()
+
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+
+        all_text = dialogue_text + "\n" + menu_text
+        all_translated = dialogue_translated + "\n" + menu_translated
+        copy_all = QPushButton("Copy All")
+        copy_all.setObjectName("BtnCopy")
+        copy_all.clicked.connect(lambda: QApplication.clipboard().setText(
+            all_translated.strip() if translation_enabled and all_translated.strip() else all_text.strip()
+        ))
+        btn_row.addWidget(copy_all)
+
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.close)
+        btn_row.addWidget(close_btn)
+        root.addLayout(btn_row)
 
 
 def main() -> int:
