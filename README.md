@@ -79,8 +79,6 @@ python main.py
 | Hotkey | Action |
 |--------|--------|
 | `Ctrl+Shift+Q` | Quick Capture |
-| `Ctrl+Shift+R` | Toggle Region Select |
-| `Ctrl+Shift+S` | Start / Stop OCR |
 
 ### Filter Presets
 

@@ -3612,8 +3612,6 @@ class MainWindow(QMainWindow):
 
         _hotkeys = [
             ("Ctrl+Shift+Q", "Quick Capture", "#4fc3f7"),
-            ("Ctrl+Shift+R", "Toggle Region Select", "#e7b85c"),
-            ("Ctrl+Shift+S", "Start / Stop OCR", "#9fd46d"),
         ]
 
         for keys, action, accent in _hotkeys:
